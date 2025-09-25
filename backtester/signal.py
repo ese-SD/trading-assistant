@@ -15,7 +15,7 @@ class Signal():
     def __init__(self, id, ttype, ticker, share_nb,money):
         """
         Args:
-        id (int): used by Brain for the historic of orders amongs other things.
+        id (int): used by Brain for the historic, and to delete limit orders, among other things.
         ttype (str): the type of the order, on which depends how it will be handled by Brain.
         ticker (str): the ticker on which the order is placed.
         share_nb (float): the number of share to buy (or *want* to buy, in case of market orders, because of slippage)

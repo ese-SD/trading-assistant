@@ -28,14 +28,19 @@ class SlippageModel:
     """
 
 
-    def __init__(self):
-        pass
-
-
+    def __init__(self, spread_fct, spread_coeff,  market_impact_fct, MI_coeff, queue_fct, queue_coeff, auct_prenium_fct, AP_coeff):
+        self.spread = (spread_fct, spread_coeff)
+        self.market_impact = (market_impact_fct, MI_coeff)
+        self.queue = (queue_fct, queue_coeff)
+        self.auction_premium = (auct_prenium_fct, AP_coeff)
 
     def compute_fill_price(self, context):
-        #fill_cost=(cost + 0.5 * spread + market_impact + queue_effect + auction prenium)*proportional_residual+flat_residual
-        pass
+        self.context=context
+        total=context["price"]
+        for fct, coeff in [self.spread, self.market_impact, self.queue, self.auction_premium]:
+            if fct is not None:
+                total += coeff * fct(self.context)
+        return total
     
 
 

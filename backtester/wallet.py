@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
-from strategies.position import LongPosition
 
 @dataclass
 class Wallet:
-    balance: float = 0.0
-    positions: list[LongPosition]
+    cash: float = 0.0
+    # Ticker : number of that share held.
+    # Can be negative (for short positions)
+    stocks: dict[str:float]
 
     

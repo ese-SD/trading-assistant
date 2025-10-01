@@ -1,14 +1,14 @@
 from dataclasses import dataclass, field
 from typing import Any
 from math import log,sqrt,exp,pi
-
+from functools import partial, partialmethod
 
 
 
 @dataclass
 class SlippageContext:
     """
-    Snapshot of the data in Brain that can be used to compute slippage.
+    Dataclass that contains the necessary infos to model slippage.
     All the data that isnt common to all slippage models is stored in extra.
     """
     price: float
@@ -21,25 +21,35 @@ class SlippageContext:
 
 class SlippageModel:
     """
-    Models the slippage when filling an order based on the order and current market conditions.
+    Models slippage when filling an order based on the order and current market conditions.
 
-    The user can customize and create their own slippage model by chosing how slippage's various components are modeled.
-    
+    User can customize and create their own slippage model by chosing different component function and their parameters.
     """
 
+    def __init__(self, spread_fct=None, spread_coeff=0.0,
+                 market_impact_fct=None, MI_coeff=0.0,
+                 queue_fct=None, queue_coeff=0.0,
+                 auct_prenium_fct=None, AP_coeff=0.0,
+                 params=None):
+        
+        # Allows for unspecified params
+        params = params or {}
 
-    def __init__(self, spread_fct, spread_coeff,  market_impact_fct, MI_coeff, queue_fct, queue_coeff, auct_prenium_fct, AP_coeff):
-        self.spread = (spread_fct, spread_coeff)
-        self.market_impact = (market_impact_fct, MI_coeff)
-        self.queue = (queue_fct, queue_coeff)
-        self.auction_premium = (auct_prenium_fct, AP_coeff)
+        partial_spread = partial(spread_fct, **params.get("spread", {})) if spread_fct else None
+        partial_mi= partial(market_impact_fct, **params.get("mi", {})) if market_impact_fct else None
+        partial_queue = partial(queue_fct, **params.get("queue", {})) if queue_fct else None
+        partial_ap = partial(auct_prenium_fct, **params.get("ap", {})) if auct_prenium_fct else None
+        self.spread = (partial_spread, spread_coeff)
+        self.market_impact = (partial_mi, MI_coeff)
+        self.queue = (partial_queue, queue_coeff)
+        self.auction_premium = (partial_ap, AP_coeff)
 
     def compute_fill_price(self, context):
         self.context=context
         total=context["price"]
         for fct, coeff in [self.spread, self.market_impact, self.queue, self.auction_premium]:
             if fct is not None:
-                total += coeff * fct(self.context)
+                total += coeff * fct(context)
         return total
     
 
@@ -47,24 +57,36 @@ class SlippageModel:
 #----------------------------------------------------------------SPREAD MODELS--------------------------------------------------------
 
 
-def model_spread_CS(H1,L1,H2,L2, upper_bound, close, correct_overnight=True, return_vol=False):
-    """ 
-    This functions approximates the spread using OHCLV data, according to the Corwin–Schultz formula.
-
-    With no access to level 2 data (bid-ask), its impossible to compute the exact spread.
-    This function aims to estimate spread using the Corwin–Schultz Spread Estimator (2012).
-    It is useful only for daily data, and can occasionaly give absurd values, which is why they're capped.
-    !! It works well with liquid assets, less with illiquid ones !!
-
-    H1 (float): highest price of day t
-    L1 (float): lowest price od day t
-    H2 (float): highest price of day t+1
-    L2 (float): lowest price of day t+1
-    upper_bound (int): caps spread value. More volatile stocks has a smaller higher cap (bps)
-    correct_overnight (Bool): Corrects for the overnight variation in high-low ratio.
-    return_vol (Bool): CS can also return estimated volatility. This argument lets the user chose to do it or not.
-    
+def model_spread_CS(context, upper_bound, close, correct_overnight=True, return_vol=False):
     """
+    Estimate bid–ask spread using the Corwin–Schultz (2012) high–low spread estimator.
+
+    Args:
+
+    context (SlippageContext): Must contain in `context.extra["OCHLV"]` at least the last two days of OHLC data.
+    upper_bound (float): Maximum allowed spread value (cap).
+    close (float): Closing price of day t+1, used if applying the overnight correction.
+    correct_overnight (bool, default=True): Adjusts for overnight price jumps between the previous close and next day's range.
+    return_vol (bool, default=False): If True, also return the estimated volatility.
+
+    Returns:
+    spread : float
+        Estimated spread, capped between 0 and `upper_bound`.
+    vol : float, optional
+        Estimated volatility (only if `return_vol=True`).
+
+    Notes:
+    Works best with liquid assets and daily data; may produce extreme values for illiquid assets.
+    """
+
+    # gets args from context
+    H1=context.extra["OCHLV"][-2]["High"]
+    H2=context.extra["OCHLV"][-1]["High"]
+    L1=context.extra["OCHLV"][-2]["Low"]
+    L2=context.extra["OCHLV"][-1]["Low"]
+
+
+
     #close: arg optionnel
     if correct_overnight:
         if(H2)<close:
@@ -109,17 +131,32 @@ def model_spread_CS(H1,L1,H2,L2, upper_bound, close, correct_overnight=True, ret
 
 
 
-
-
-
-
 #------------------------------------------------------------MARKET IMPACT MODELS--------------------------------------------------------
 
 
-def model_market_impact_sqrt(daily_volume, liquidity, order_size, volatility):
+def model_market_impact_sqrt(context):
     """effective on low frequency strategies"""
-    return volatility* sqrt(order_size/daily_volume)
+    daily_volume=context.extra["OCHLV"][-1]["Volume"]
+    volatility=0#?????
+    return volatility* sqrt(context.order_size/daily_volume)
 
 
-def market_impact_Almgren_Chriss():
+def market_impact_Almgren_Chriss(context):
     pass
+
+
+
+
+
+
+
+
+#------------------------------------------------------------QUEUE MODELS--------------------------------------------------------
+
+
+
+
+#------------------------------------------------------------AUCTION PRENIUM MODELS--------------------------------------------------------
+
+
+

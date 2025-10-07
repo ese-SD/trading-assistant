@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from math import log,sqrt,exp,pi
 from functools import partial, partialmethod
+from datetime import datetime
 
 
 
@@ -11,9 +12,9 @@ class SlippageContext:
     Dataclass that contains the necessary infos to model slippage.
     All the data that isnt common to all slippage models is stored in extra.
     """
-    price: float
-    order_size: int
-    timestamp: str
+    price: float = field(default=0)
+    order_size: int = field(default=0)
+    timestamp: str =field(default=datetime(1970, 1, 1))
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -74,7 +75,7 @@ class SlippageModel:
             total (float): The adjusted fill price after applying all slippage components.
         """
         self.context=context
-        total=context["price"]
+        total=float(context.price)
         for fct, coeff in [self.spread, self.market_impact, self.queue, self.auction_premium]:
             if fct is not None:
                 total += coeff * fct(context)

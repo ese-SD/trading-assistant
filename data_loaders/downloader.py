@@ -22,7 +22,8 @@ def download(API, ticker, start, end, interval, name: Path | str , folder: Path 
         start (datetime): starting period of the historical data to download. (inclusive)
         end (datetime): ending period of the historical data to download. (inclusive)
         interval(???): how far appart each "point" should be in time. 
-        path (string/Path): path of the file in which to save the downloaded data. starts from project folder/data/
+        name (Path | str): name given to the file the data is saved in. If a Path is given, only the last part of 'name' will be kept, to not interfere with 'folder'.
+        folder (Path | str): folder in which to save the file. If not specified, it will be saved in the 'data' folder, within the main project folder
         key (str): API key if necessary.
         auto_adjust (Bool): wether prices have to be adjusted for dividends or share splitting within the period.
             e.g.: a 100$ share will go to 98$ the day after a 2$ per share dividend has been distributed, but the value of the share has only decreased artificially.
@@ -34,7 +35,7 @@ def download(API, ticker, start, end, interval, name: Path | str , folder: Path 
         UserWarning: If API data is incomplete or possibly truncated.
     
     """
-    if type(start)!=datetime or type(end)!=datetime:
+    if not isinstance(start, datetime) or not isinstance(end, datetime) :
         raise TypeError("start and stop have to be datetimes")
     
     if start.tzinfo is None or end.tzinfo is None:
